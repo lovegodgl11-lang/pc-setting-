@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" class=""><head><script>window.livecodes = window.livecodes || {};</script><title>Window setting </title><meta name="title" content="Window setting "><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="./style.css"><script src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js" async=""></script><script type="importmap">{
+  "imports": {}
+}</script></head><body>
+
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desktop Link Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+    </style>
+
+
+
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-slate-800 mb-2">Desktop Icon Settings</h1>
+        <p class="text-slate-500 mb-6">Add, edit, or delete the icons that appear on your virtual desktop.</p>
+        
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 id="form-title" class="text-2xl font-bold text-slate-700 mb-4">Add a New Link</h2>
+            <form id="link-form" class="space-y-4">
+                <input type="hidden" id="link-id">
+                <div>
+                    <label for="link-name" class="block text-sm font-medium text-gray-700">Link Name</label>
+                    <input type="text" id="link-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g., Google" required="">
+                </div>
+                <div>
+                    <label for="link-url" class="block text-sm font-medium text-gray-700">Link URL</label>
+                    <input type="url" id="link-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="https://www.google.com" required="">
+                </div>
+                <div class="flex items-center gap-4">
+                    <button type="submit" id="submit-btn" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-700">Add Link</button>
+                    <button type="button" id="cancel-edit-btn" class="hidden bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300">Cancel Edit</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="links-list" class="space-y-3">
+            <p class="text-center text-gray-500 py-8">Loading links...</p>
+        </div>
+    </div>
+    
+    <div id="toast" class="hidden fixed bottom-5 right-5 bg-gray-900 text-white py-2 px-4 rounded-lg shadow-lg"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyC0_DQIiyaVQllFH4pxH1Dm3r2kFXXoOgc",
+            authDomain: "navrosetailorapp.firebaseapp.com",
+            databaseURL: "https://navrosetailorapp-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "navrosetailorapp"
+        };
+        
+        let db;
+        const linkForm = document.getElementById('link-form');
+        const linkIdInput = document.getElementById('link-id');
+        const linkNameInput = document.getElementById('link-name');
+        const linkUrlInput = document.getElementById('link-url');
+        const formTitle = document.getElementById('form-title');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const linksList = document.getElementById('links-list');
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function renderLinks(snapshot) {
+            linksList.innerHTML = '';
+            const links = snapshot.val();
+            if (!links) {
+                linksList.innerHTML = '<p class="text-center text-gray-500 py-8">No links configured yet. Add one using the form above.</p>';
+                return;
+            }
+            
+            Object.values(links).forEach(link => {
+                const linkEl = document.createElement('div');
+                linkEl.className = 'bg-white p-4 rounded-lg shadow-sm flex items-center justify-between';
+                linkEl.innerHTML = `
+                    <div>
+                        <p class="font-bold text-slate-800">${link.name}</p>
+                        <p class="text-sm text-slate-500">${link.url}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="edit-btn text-sm font-semibold text-blue-600 hover:underline">Edit</button>
+                        <button class="delete-btn text-sm font-semibold text-red-600 hover:underline">Delete</button>
+                    </div>
+                `;
+                
+                linkEl.querySelector('.edit-btn').addEventListener('click', () => populateFormForEdit(link));
+                linkEl.querySelector('.delete-btn').addEventListener('click', () => deleteLink(link.id));
+                
+                linksList.appendChild(linkEl);
+            });
+        }
+        
+        function populateFormForEdit(link) {
+            linkIdInput.value = link.id;
+            linkNameInput.value = link.name;
+            linkUrlInput.value = link.url;
+            
+            formTitle.textContent = 'Edit Link';
+            submitBtn.textContent = 'Save Changes';
+            cancelEditBtn.classList.remove('hidden');
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function resetForm() {
+            linkForm.reset();
+            linkIdInput.value = '';
+            formTitle.textContent = 'Add a New Link';
+            submitBtn.textContent = 'Add Link';
+            cancelEditBtn.classList.add('hidden');
+        }
+
+        function saveLink(e) {
+            e.preventDefault();
+            const id = linkIdInput.value;
+            const name = linkNameInput.value.trim();
+            const url = linkUrlInput.value.trim();
+
+            if (!name || !url) {
+                showToast("Name and URL cannot be empty.");
+                return;
+            }
+            
+            if (id) {
+                // Update existing link
+                const linkData = { id, name, url };
+                db.ref('desktop_links/' + id).set(linkData)
+                    .then(() => {
+                        showToast("Link updated successfully.");
+                        resetForm();
+                    })
+                    .catch(err => {
+                        showToast("Error updating link.");
+                        console.error(err);
+                    });
+            } else {
+                // Add new link
+                const newLinkRef = db.ref('desktop_links').push();
+                const newId = newLinkRef.key;
+                const linkData = { id: newId, name, url };
+                newLinkRef.set(linkData)
+                    .then(() => {
+                        showToast("Link added successfully.");
+                        linkForm.reset();
+                    })
+                    .catch(err => {
+                        showToast("Error adding link.");
+                        console.error(err);
+                    });
+            }
+        }
+
+        function deleteLink(id) {
+            if (confirm("Are you sure you want to delete this link?")) {
+                db.ref('desktop_links/' + id).remove()
+                    .then(() => showToast("Link deleted."))
+                    .catch(err => showToast("Error deleting link."));
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                db = firebase.database();
+                
+                const linksRef = db.ref('desktop_links');
+                linksRef.on('value', renderLinks);
+
+                linkForm.addEventListener('submit', saveLink);
+                cancelEditBtn.addEventListener('click', resetForm);
+
+            } catch (e) {
+                console.error(e);
+                linksList.innerHTML = `<p class="text-center text-red-500">Failed to load data. Check Firebase connection.</p>`;
+                alert("Firebase connection failed.");
+            }
+        });
+    </script>
+
+
+
+<script src="./script.js"></script></body></html>
